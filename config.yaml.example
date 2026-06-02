@@ -1,0 +1,4 @@
+somebody:
+  url_prefix: "/secret_path/secret_key"
+  config: "/configs/somebody.yaml"
+  
