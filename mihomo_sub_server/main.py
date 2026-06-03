@@ -13,7 +13,6 @@ DEFAULT_CONFIG_PATH = "/app/config.yaml"
 def create_app(config_path: str | None = None) -> FastAPI:
     subscriptions = load_subscriptions(config_path or os.getenv("APP_CONFIG", DEFAULT_CONFIG_PATH))
     app = FastAPI(title="Mihomo Subscription Server")
-    app.state.subscriptions = subscriptions
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:

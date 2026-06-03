@@ -49,8 +49,9 @@ def load_subscriptions(config_path: str | Path) -> dict[str, Subscription]:
             raise ConfigError(f"User '{user}' must define a non-empty url_prefix")
         if not url_prefix.startswith("/"):
             raise ConfigError(f"User '{user}' url_prefix must start with '/'")
-        if url_prefix == "/healthz":
-            raise ConfigError("url_prefix '/healthz' is reserved")
+        _RESERVED = {"/healthz", "/docs", "/redoc", "/openapi.json"}
+        if url_prefix in _RESERVED:
+            raise ConfigError(f"url_prefix '{url_prefix}' is reserved")
         if url_prefix in subscriptions:
             other_user = subscriptions[url_prefix].user
             raise ConfigError(
