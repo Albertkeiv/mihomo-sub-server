@@ -56,13 +56,15 @@ def create_app(config_path: str | None = None) -> FastAPI:
 
     @app.get("/{request_path:path}")
     def get_subscription(request_path: str, request: Request) -> Response:
+        client_ip = request.client.host if request.client else "unknown"
+        ua = request.headers.get("user-agent", "")
+        logger.info("request ip=%s path=/%s ua=%r", client_ip, request_path, ua)
+
         if allowed_uas:
-            ua = request.headers.get("user-agent", "")
             if not any(fnmatch.fnmatch(ua, pattern) for pattern in allowed_uas):
                 return Response(status_code=404)
 
         if rate_limiter is not None:
-            client_ip = request.client.host if request.client else "unknown"
             if not rate_limiter.is_allowed(client_ip):
                 return Response(status_code=429)
 
@@ -70,11 +72,6 @@ def create_app(config_path: str | None = None) -> FastAPI:
         subscription = app_config.subscriptions.get(url_path)
         if subscription is None:
             return Response(status_code=404)
-
-        client_ip = request.client.host if request.client else "unknown"
-        ua = request.headers.get("user-agent", "")
-        logger.info("served user=%s ip=%s ua=%r", subscription.user, client_ip, ua)
-
         return Response(content=subscription.content, media_type="application/yaml")
 
     return app
