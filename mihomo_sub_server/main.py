@@ -1,27 +1,70 @@
 from __future__ import annotations
 
+import fnmatch
 import os
+import threading
+import time
+from collections import defaultdict, deque
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import Response
 
-from mihomo_sub_server.config import ConfigError, load_subscriptions
+from mihomo_sub_server.config import AppConfig, ConfigError, RateLimitConfig, load_config
 
 DEFAULT_CONFIG_PATH = "/app/config.yaml"
 
 
+class _RateLimiter:
+    """Sliding-window in-memory rate limiter, keyed by client IP."""
+
+    def __init__(self, cfg: RateLimitConfig) -> None:
+        self._requests = cfg.requests
+        self._window = cfg.window_seconds
+        self._buckets: dict[str, deque[float]] = defaultdict(deque)
+        self._lock = threading.Lock()
+
+    def is_allowed(self, key: str) -> bool:
+        now = time.monotonic()
+        cutoff = now - self._window
+        with self._lock:
+            dq = self._buckets[key]
+            while dq and dq[0] < cutoff:
+                dq.popleft()
+            if len(dq) >= self._requests:
+                return False
+            dq.append(now)
+            return True
+
+
 def create_app(config_path: str | None = None) -> FastAPI:
-    subscriptions = load_subscriptions(config_path or os.getenv("APP_CONFIG", DEFAULT_CONFIG_PATH))
+    app_config = load_config(config_path or os.getenv("APP_CONFIG", DEFAULT_CONFIG_PATH))
     app = FastAPI(title="Mihomo Subscription Server")
+
+    rate_limiter = (
+        _RateLimiter(app_config.server.rate_limit)
+        if app_config.server.rate_limit is not None
+        else None
+    )
+    allowed_uas = app_config.server.allowed_user_agents
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
         return {"status": "ok"}
 
     @app.get("/{request_path:path}")
-    def get_subscription(request_path: str) -> Response:
+    def get_subscription(request_path: str, request: Request) -> Response:
+        if allowed_uas:
+            ua = request.headers.get("user-agent", "")
+            if not any(fnmatch.fnmatch(ua, pattern) for pattern in allowed_uas):
+                raise HTTPException(status_code=403, detail="Forbidden")
+
+        if rate_limiter is not None:
+            client_ip = request.client.host if request.client else "unknown"
+            if not rate_limiter.is_allowed(client_ip):
+                raise HTTPException(status_code=429, detail="Too Many Requests")
+
         url_path = f"/{request_path}"
-        subscription = subscriptions.get(url_path)
+        subscription = app_config.subscriptions.get(url_path)
         if subscription is None:
             raise HTTPException(status_code=404, detail="Subscription not found")
         return Response(content=subscription.content, media_type="application/yaml")
@@ -29,5 +72,4 @@ def create_app(config_path: str | None = None) -> FastAPI:
     return app
 
 
-__all__ = ["ConfigError", "create_app"]
-
+__all__ = ["AppConfig", "ConfigError", "create_app"]

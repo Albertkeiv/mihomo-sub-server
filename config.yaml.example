@@ -1,4 +1,19 @@
+# Rate limiting: sliding window per client IP.
+# Remove to disable rate limiting.
+rate_limit:
+  requests: 10          # max requests per window
+  window_seconds: 60    # window size in seconds
+
+# Allowed User-Agent patterns (fnmatch wildcards).
+# Remove or leave empty to allow all clients.
+allowed_user_agents:
+  - "clash*"
+  - "mihomo*"
+  - "ClashForWindows/*"
+  - "ClashForAndroid/*"
+  - "Stash/*"
+
+# One entry per user. The url_prefix is the secret path clients use.
 somebody:
   url_prefix: "/secret_path/secret_key"
   config: "/configs/somebody.yaml"
-  
