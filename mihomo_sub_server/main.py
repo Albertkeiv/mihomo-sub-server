@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import fnmatch
+import logging
 import os
 import threading
 import time
 from collections import defaultdict, deque
 
 from fastapi import FastAPI, Request
+
+logger = logging.getLogger(__name__)
 from fastapi.responses import Response
 
 from mihomo_sub_server.config import AppConfig, ConfigError, RateLimitConfig, load_config
@@ -67,6 +70,11 @@ def create_app(config_path: str | None = None) -> FastAPI:
         subscription = app_config.subscriptions.get(url_path)
         if subscription is None:
             return Response(status_code=404)
+
+        client_ip = request.client.host if request.client else "unknown"
+        ua = request.headers.get("user-agent", "")
+        logger.info("served user=%s ip=%s ua=%r", subscription.user, client_ip, ua)
+
         return Response(content=subscription.content, media_type="application/yaml")
 
     return app
