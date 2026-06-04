@@ -9,7 +9,7 @@ from collections import defaultdict, deque
 
 from fastapi import FastAPI, Request
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn.error")
 from fastapi.responses import Response
 
 from mihomo_sub_server.config import AppConfig, ConfigError, RateLimitConfig, load_config
