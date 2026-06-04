@@ -6,7 +6,7 @@ import threading
 import time
 from collections import defaultdict, deque
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, Request
 from fastapi.responses import Response
 
 from mihomo_sub_server.config import AppConfig, ConfigError, RateLimitConfig, load_config
@@ -56,17 +56,17 @@ def create_app(config_path: str | None = None) -> FastAPI:
         if allowed_uas:
             ua = request.headers.get("user-agent", "")
             if not any(fnmatch.fnmatch(ua, pattern) for pattern in allowed_uas):
-                raise HTTPException(status_code=403, detail="Forbidden")
+                return Response(status_code=404)
 
         if rate_limiter is not None:
             client_ip = request.client.host if request.client else "unknown"
             if not rate_limiter.is_allowed(client_ip):
-                raise HTTPException(status_code=429, detail="Too Many Requests")
+                return Response(status_code=429)
 
         url_path = f"/{request_path}"
         subscription = app_config.subscriptions.get(url_path)
         if subscription is None:
-            raise HTTPException(status_code=404, detail="Subscription not found")
+            return Response(status_code=404)
         return Response(content=subscription.content, media_type="application/yaml")
 
     return app

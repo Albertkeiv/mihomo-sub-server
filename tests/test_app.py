@@ -47,6 +47,7 @@ def test_unknown_path_returns_404(tmp_path):
     client = _make_app(tmp_path)
     response = client.get("/unknown")
     assert response.status_code == 404
+    assert response.content == b""
 
 
 def test_duplicate_url_prefix_fails_startup(tmp_path):
