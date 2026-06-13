@@ -132,26 +132,36 @@ allowed_user_agents:
 
 # --- Rate limiting ---
 
-def test_rate_limit_allows_within_limit(tmp_path):
-    client = _make_app(tmp_path, extra_config="""\
-rate_limit:
-  requests: 3
-  window_seconds: 60
-""")
-    for _ in range(3):
-        assert client.get("/secret_path/secret_key").status_code == 200
-
-
-def test_rate_limit_blocks_after_exceeded(tmp_path):
+def test_rate_limit_does_not_count_successful_requests(tmp_path):
     client = _make_app(tmp_path, extra_config="""\
 rate_limit:
   requests: 2
   window_seconds: 60
 """)
-    client.get("/secret_path/secret_key")
-    client.get("/secret_path/secret_key")
-    response = client.get("/secret_path/secret_key")
-    assert response.status_code == 429
+    for _ in range(10):
+        assert client.get("/secret_path/secret_key").status_code == 200
+
+
+def test_rate_limit_counts_failed_requests(tmp_path):
+    client = _make_app(tmp_path, extra_config="""\
+rate_limit:
+  requests: 2
+  window_seconds: 60
+""")
+    client.get("/wrong1")
+    client.get("/wrong2")
+    assert client.get("/wrong3").status_code == 429
+
+
+def test_rate_limit_blocks_correct_path_after_failures(tmp_path):
+    client = _make_app(tmp_path, extra_config="""\
+rate_limit:
+  requests: 2
+  window_seconds: 60
+""")
+    client.get("/wrong1")
+    client.get("/wrong2")
+    assert client.get("/secret_path/secret_key").status_code == 429
 
 
 def test_healthz_not_rate_limited(tmp_path):
